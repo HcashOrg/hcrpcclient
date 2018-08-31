@@ -173,5 +173,6 @@ The following full-blown client examples are in the examples directory:
    Connects to a hcwallet RPC server using TLS-secured websockets, registers
    for notifications about changes to account balances, and gets a list of
    unspent transaction outputs (utxos) the wallet can sign
+   package hcrpcclient;
 */
 package hcrpcclient
