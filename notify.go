@@ -1541,18 +1541,3 @@ func (c *Client) LoadTxFilterAsync(reload bool, addresses []hcutil.Address,
 func (c *Client) LoadTxFilter(reload bool, addresses []hcutil.Address, outPoints []wire.OutPoint) error {
 	return c.LoadTxFilterAsync(reload, addresses, outPoints).Receive()
 }
-
-type FutureSetParamsResult chan *response
-
-func (r FutureSetParamsResult) Receive() error {
-	_, err := receiveFuture(r)
-	return err
-}
-func (c *Client) LoadSetParamsAsync(enableOmni bool) FutureSetParamsResult {
-	cmd := hcjson.NewSetHcdParmasCmd(enableOmni)
-	return c.sendCmd(cmd)
-}
-
-func (c *Client) SetParams(enableOmni bool) error {
-	return c.LoadSetParamsAsync(enableOmni).Receive()
-}
