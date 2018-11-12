@@ -1548,6 +1548,7 @@ func (r FutureSetParamsResult) Receive() error {
 	_, err := receiveFuture(r)
 	return err
 }
+/*
 func (c *Client) LoadSetParamsAsync(enableOmni bool) FutureSetParamsResult {
 	cmd := hcjson.NewSetHcdParmasCmd(enableOmni)
 	return c.sendCmd(cmd)
@@ -1556,3 +1557,4 @@ func (c *Client) LoadSetParamsAsync(enableOmni bool) FutureSetParamsResult {
 func (c *Client) SetParams(enableOmni bool) error {
 	return c.LoadSetParamsAsync(enableOmni).Receive()
 }
+*/
