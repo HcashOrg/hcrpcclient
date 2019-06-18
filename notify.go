@@ -40,6 +40,7 @@ type notificationState struct {
 	notifyStakeDifficulty       bool
 	notifyNewTx                 bool
 	notifyNewTxVerbose          bool
+	notifyNewInstantTx bool
 }
 
 // Copy returns a deep copy of the receiver.
@@ -52,7 +53,7 @@ func (s *notificationState) Copy() *notificationState {
 	stateCopy.notifyStakeDifficulty = s.notifyStakeDifficulty
 	stateCopy.notifyNewTx = s.notifyNewTx
 	stateCopy.notifyNewTxVerbose = s.notifyNewTxVerbose
-
+	stateCopy.notifyNewInstantTx=s.notifyNewInstantTx
 	return &stateCopy
 }
 
@@ -202,6 +203,8 @@ type NotificationHandlers struct {
 	// the caller is using a custom notification this package does not know
 	// about.
 	OnUnknownNotification func(method string, params []json.RawMessage)
+
+	OnNewInstantTx func(lotteryHash *chainhash.Hash,tickets []*chainhash.Hash)
 }
 
 // handleNotification examines the passed notification type, performs
@@ -253,6 +256,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 	case hcjson.RelevantTxAcceptedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
+		log.Error("RelevantTxAcceptedNtfnMethod:",ntfn.Params)
 		if c.ntfnHandlers.OnRelevantTxAccepted == nil {
 			return
 		}
@@ -381,7 +385,18 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		}
 
 		c.ntfnHandlers.OnTxAccepted(hash, amt)
+	case hcjson.InstantTxNtfnMethod:
+		if c.ntfnHandlers.OnNewInstantTx==nil{
+			return
+		}
+		hash,tickets,err:=parseInstantTxParams(ntfn.Params)
 
+		if err!=nil{
+			log.Warnf("Received invalid instant tx accepted "+
+				"notification: %v", err)
+			return
+		}
+		c.ntfnHandlers.OnNewInstantTx(hash,tickets)
 	// OnTxAcceptedVerbose
 	case hcjson.TxAcceptedVerboseNtfnMethod:
 		// Ignore the notification if the client is not interested in
@@ -936,6 +951,52 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	return txHash, amt, nil
 }
 
+func parseInstantTxParams(params []json.RawMessage)(*chainhash.Hash,[]*chainhash.Hash,error)  {
+	if len(params) != 2 {
+		return nil, nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	var txHashStr string
+	err := json.Unmarshal(params[0], &txHashStr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create ShaHash from block sha string.
+	instantTxHash, err := chainhash.NewHashFromStr(txHashStr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+
+	tickets := make(map[string]string)
+	err = json.Unmarshal(params[1], &tickets)
+	if err != nil {
+		return nil,nil, err
+	}
+	t := make([]*chainhash.Hash, len(tickets))
+
+	for i, ticketHashStr := range tickets {
+		// Create and cache Hash from tx hash.
+		ticketHash, err := chainhash.NewHashFromStr(ticketHashStr)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		itr, err := strconv.Atoi(i)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		t[itr] = ticketHash
+	}
+
+	return instantTxHash ,t,nil
+
+
+}
+
 // parseTxAcceptedVerboseNtfnParams parses out details about a raw transaction
 // from the parameters of a txacceptedverbose notification.
 func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*hcjson.TxRawResult,
@@ -1220,6 +1281,7 @@ func (c *Client) NotifyBlocks() error {
 // FutureNotifyWinningTicketsResult is a future promise to deliver the result of a
 // NotifyWinningTicketsAsync RPC invocation (or an applicable error).
 type FutureNotifyWinningTicketsResult chan *response
+type FutureNotifyNewInstantTxResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
 // if the registration was not successful.
@@ -1232,6 +1294,14 @@ func (r FutureNotifyWinningTicketsResult) Receive() error {
 	return nil
 }
 
+func (r FutureNotifyNewInstantTxResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 // NotifyWinningTicketsAsync returns an instance of a type that can be used
 // to  get the result of the RPC at some future time by invoking the Receive
 // function on the returned instance.
@@ -1256,6 +1326,26 @@ func (c *Client) NotifyWinningTicketsAsync() FutureNotifyWinningTicketsResult {
 	return c.sendCmd(cmd)
 }
 
+
+
+func (c *Client) NotifyNewInstantTxAsync() FutureNotifyNewInstantTxResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	cmd := hcjson.NewNotifyInstantTxCmd()
+
+	return c.sendCmd(cmd)
+}
+
+
 // NotifyWinningTickets registers the client to receive notifications when
 // blocks are connected to the main chain and tickets are spent or missed.  The
 // notifications are delivered to the notification handlers associated with the
@@ -1270,6 +1360,11 @@ func (c *Client) NotifyWinningTicketsAsync() FutureNotifyWinningTicketsResult {
 func (c *Client) NotifyWinningTickets() error {
 	return c.NotifyWinningTicketsAsync().Receive()
 }
+
+func (c *Client)NotifyNewInstantTx() error {
+	return c.NotifyNewInstantTxAsync().Receive()
+}
+
 
 // FutureNotifySpentAndMissedTicketsResult is a future promise to deliver the result of a
 // NotifySpentAndMissedTicketsAsync RPC invocation (or an applicable error).

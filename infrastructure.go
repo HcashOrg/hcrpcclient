@@ -243,7 +243,8 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 	switch bcmd := cmd.(type) {
 	case *hcjson.NotifyWinningTicketsCmd:
 		c.ntfnState.notifyWinningTickets = true
-
+	case *hcjson.NotifyNewInstantTxCmd:
+		c.ntfnState.notifyNewInstantTx=true
 	case *hcjson.NotifySpentAndMissedTicketsCmd:
 		c.ntfnState.notifySpentAndMissedTickets = true
 
@@ -558,6 +559,15 @@ func (c *Client) reregisterNtfns() error {
 			return err
 		}
 	}
+
+	// Reregister notifywinningtickets if needed.
+	if stateCopy.notifyNewInstantTx {
+		log.Debugf("Reregistering [notifywinningtickets]")
+		if err := c.NotifyNewInstantTx(); err != nil {
+			return err
+		}
+	}
+
 
 	return nil
 }
