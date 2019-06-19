@@ -560,7 +560,7 @@ func (c *Client) reregisterNtfns() error {
 		}
 	}
 
-	// Reregister notifywinningtickets if needed.
+	// Reregister notifyinstanttx if needed.
 	if stateCopy.notifyNewInstantTx {
 		log.Debugf("Reregistering [notifywinningtickets]")
 		if err := c.NotifyNewInstantTx(); err != nil {
