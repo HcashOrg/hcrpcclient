@@ -13,8 +13,8 @@ import (
 
 	"github.com/HcashOrg/hcd/chaincfg/chainhash"
 	"github.com/HcashOrg/hcd/hcjson"
-	"github.com/HcashOrg/hcd/wire"
 	"github.com/HcashOrg/hcd/hcutil"
+	"github.com/HcashOrg/hcd/wire"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
@@ -702,4 +702,42 @@ func (c *Client) GetCoinSupplyAsync() FutureGetCoinSupplyResult {
 // GetCoinSupply returns the current coin supply
 func (c *Client) GetCoinSupply() (hcutil.Amount, error) {
 	return c.GetCoinSupplyAsync().Receive()
+}
+
+// GetBlockChainInfo returns information about the current state of the block
+// chain.
+func (c *Client) GetBlockChainInfo() (*hcjson.GetBlockChainInfoResult, error) {
+	return c.GetBlockChainInfoAsync().Receive()
+}
+
+// GetBlockChainInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetBlockChainInfo for the blocking version and more details.
+func (c *Client) GetBlockChainInfoAsync() FutureGetBlockChainInfoResult {
+	cmd := hcjson.NewGetBlockChainInfoCmd()
+	return c.sendCmd(cmd)
+}
+
+// FutureGetBlockChainInfoResult is a future promise to deliver the result of a
+// GetBlockChainInfoAsync RPC invocation (or an applicable error).
+type FutureGetBlockChainInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureGetBlockChainInfoResult) Receive() (*hcjson.GetBlockChainInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a getblockchaininfo result object.
+	var blockchainInfoRes hcjson.GetBlockChainInfoResult
+	err = json.Unmarshal(res, &blockchainInfoRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blockchainInfoRes, nil
 }
