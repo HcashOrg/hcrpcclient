@@ -15,8 +15,8 @@ import (
 
 	"github.com/HcashOrg/hcd/chaincfg/chainhash"
 	"github.com/HcashOrg/hcd/hcjson"
-	"github.com/HcashOrg/hcd/wire"
 	"github.com/HcashOrg/hcd/hcutil"
+	"github.com/HcashOrg/hcd/wire"
 )
 
 var (
@@ -283,9 +283,28 @@ func (c *Client) ExistsMissedTickets(hashes []*chainhash.Hash) (string, error) {
 // applicable error).
 type FutureExistsExpiredTicketsResult chan *response
 
+type FutureExistsExpiredAiTicketsResult chan *response
+
 // Receive waits for the response promised by the future and returns whether
 // or not the ticket exists in the live ticket database.
 func (r FutureExistsExpiredTicketsResult) Receive() (string, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Unmarshal the result as a string.
+	var exists string
+	err = json.Unmarshal(res, &exists)
+	if err != nil {
+		return "", err
+	}
+	return exists, nil
+}
+
+// Receive waits for the response promised by the future and returns whether
+// or not the ticket exists in the live ticket database.
+func (r FutureExistsExpiredAiTicketsResult) Receive() (string, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return "", err
@@ -310,6 +329,19 @@ func (c *Client) ExistsExpiredTicketsAsync(hashes []*chainhash.Hash) FutureExist
 			hash[:])
 	}
 	cmd := hcjson.NewExistsExpiredTicketsCmd(hex.EncodeToString(hashBlob))
+	return c.sendCmd(cmd)
+}
+
+// ExistsExpiredTicketsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) ExistsExpiredAiTicketsAsync(hashes []*chainhash.Hash) FutureExistsExpiredAiTicketsResult {
+	hashBlob := make([]byte, len(hashes)*chainhash.HashSize)
+	for i, hash := range hashes {
+		copy(hashBlob[i*chainhash.HashSize:(i+1)*chainhash.HashSize],
+			hash[:])
+	}
+	cmd := hcjson.NewExistsExpiredAiTicketsCmd(hex.EncodeToString(hashBlob))
 	return c.sendCmd(cmd)
 }
 
@@ -363,10 +395,25 @@ func (c *Client) ExistsLiveTicket(hash *chainhash.Hash) (bool, error) {
 // of a FutureExistsLiveTicketsResultAsync RPC invocation (or an
 // applicable error).
 type FutureExistsLiveTicketsResult chan *response
+type FutureExistsLiveAiTicketsResult chan *response
 
 // Receive waits for the response promised by the future and returns whether
 // or not the ticket exists in the live ticket database.
 func (r FutureExistsLiveTicketsResult) Receive() (string, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Unmarshal the result as a string.
+	var exists string
+	err = json.Unmarshal(res, &exists)
+	if err != nil {
+		return "", err
+	}
+	return exists, nil
+}
+func (r FutureExistsLiveAiTicketsResult) Receive() (string, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return "", err
@@ -391,6 +438,15 @@ func (c *Client) ExistsLiveTicketsAsync(hashes []*chainhash.Hash) FutureExistsLi
 			hash[:])
 	}
 	cmd := hcjson.NewExistsLiveTicketsCmd(hex.EncodeToString(hashBlob))
+	return c.sendCmd(cmd)
+}
+func (c *Client) ExistsLiveAiTicketsAsync(hashes []*chainhash.Hash) FutureExistsLiveAiTicketsResult {
+	hashBlob := make([]byte, len(hashes)*chainhash.HashSize)
+	for i, hash := range hashes {
+		copy(hashBlob[i*chainhash.HashSize:(i+1)*chainhash.HashSize],
+			hash[:])
+	}
+	cmd := hcjson.NewExistsLiveAiTicketsCmd(hex.EncodeToString(hashBlob))
 	return c.sendCmd(cmd)
 }
 
@@ -650,6 +706,8 @@ func (c *Client) GetHeaders(blockLocators []chainhash.Hash, hashStop *chainhash.
 // GetStakeDifficultyAsync RPC invocation (or an applicable error).
 type FutureGetStakeDifficultyResult chan *response
 
+type FutureGetAiStakeDifficultyResult chan *response
+
 // Receive waits for the response promised by the future and returns the network
 // the server is running on.
 func (r FutureGetStakeDifficultyResult) Receive() (*hcjson.GetStakeDifficultyResult, error) {
@@ -660,6 +718,22 @@ func (r FutureGetStakeDifficultyResult) Receive() (*hcjson.GetStakeDifficultyRes
 
 	// Unmarshal result as a hcjson.GetStakeDifficultyResult.
 	var gsdr hcjson.GetStakeDifficultyResult
+	err = json.Unmarshal(res, &gsdr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gsdr, nil
+}
+
+func (r FutureGetAiStakeDifficultyResult) Receive() (*hcjson.GetAiStakeDifficultyResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a hcjson.GetStakeDifficultyResult.
+	var gsdr hcjson.GetAiStakeDifficultyResult
 	err = json.Unmarshal(res, &gsdr)
 	if err != nil {
 		return nil, err
@@ -684,6 +758,25 @@ func (c *Client) GetStakeDifficultyAsync() FutureGetStakeDifficultyResult {
 //
 // NOTE: This is a hcd extension.
 func (c *Client) GetStakeDifficulty() (*hcjson.GetStakeDifficultyResult, error) {
+	return c.GetStakeDifficultyAsync().Receive()
+}
+
+// GetStakeDifficultyAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetStakeDifficulty for the blocking version and more details.
+//
+// NOTE: This is a hcd extension.
+func (c *Client) GetAiStakeDifficultyAsync() FutureGetAiStakeDifficultyResult {
+	cmd := hcjson.NewGetAiStakeDifficultyCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetStakeDifficulty returns the current and next stake difficulty.
+//
+// NOTE: This is a hcd extension.
+func (c *Client) GetAiStakeDifficulty() (*hcjson.GetStakeDifficultyResult, error) {
 	return c.GetStakeDifficultyAsync().Receive()
 }
 
