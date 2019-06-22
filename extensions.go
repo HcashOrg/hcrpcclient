@@ -776,8 +776,8 @@ func (c *Client) GetAiStakeDifficultyAsync() FutureGetAiStakeDifficultyResult {
 // GetStakeDifficulty returns the current and next stake difficulty.
 //
 // NOTE: This is a hcd extension.
-func (c *Client) GetAiStakeDifficulty() (*hcjson.GetStakeDifficultyResult, error) {
-	return c.GetStakeDifficultyAsync().Receive()
+func (c *Client) GetAiStakeDifficulty() (*hcjson.GetAiStakeDifficultyResult, error) {
+	return c.GetAiStakeDifficultyAsync().Receive()
 }
 
 // FutureGetStakeVersionsResult is a future promise to deliver the result of a
