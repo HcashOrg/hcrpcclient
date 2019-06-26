@@ -204,7 +204,7 @@ type NotificationHandlers struct {
 	// about.
 	OnUnknownNotification func(method string, params []json.RawMessage)
 
-	OnNewInstantTx  func(lotteryHash *chainhash.Hash, tickets []*chainhash.Hash)
+	OnNewInstantTx  func(tx []byte, tickets []*chainhash.Hash,resend bool)
 	OnInstantTxVote func(instantTxVoteHash *chainhash.Hash, instantTxHash *chainhash.Hash, tickeHash *chainhash.Hash, vote bool, sig []byte)
 }
 
@@ -390,14 +390,14 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		if c.ntfnHandlers.OnNewInstantTx == nil {
 			return
 		}
-		hash, tickets, err := parseInstantTxParams(ntfn.Params)
+		instantTxBytes, tickets,resend,err := parseInstantTxParams(ntfn.Params)
 
 		if err != nil {
 			log.Warnf("Received invalid instant tx accepted "+
 				"notification: %v", err)
 			return
 		}
-		c.ntfnHandlers.OnNewInstantTx(hash, tickets)
+		c.ntfnHandlers.OnNewInstantTx(instantTxBytes, tickets,resend)
 	case hcjson.InstantTxVoteNtfnMethod:
 		if c.ntfnHandlers.OnInstantTxVote == nil {
 			return
@@ -964,28 +964,21 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	return txHash, amt, nil
 }
 
-func parseInstantTxParams(params []json.RawMessage) (*chainhash.Hash, []*chainhash.Hash, error) {
-	if len(params) != 2 {
-		return nil, nil, wrongNumParams(len(params))
+func parseInstantTxParams(params []json.RawMessage) ([]byte, []*chainhash.Hash, bool,error) {
+	if len(params) != 3 {
+		return nil, nil, false,wrongNumParams(len(params))
 	}
 
-	// Unmarshal first parameter as a string.
-	var txHashStr string
-	err := json.Unmarshal(params[0], &txHashStr)
+	instantTxBytes,err:=parseHexParam(params[0])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil,false, err
 	}
 
-	// Create ShaHash from block sha string.
-	instantTxHash, err := chainhash.NewHashFromStr(txHashStr)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	tickets := make(map[string]string)
 	err = json.Unmarshal(params[1], &tickets)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil,false, err
 	}
 	t := make([]*chainhash.Hash, len(tickets))
 
@@ -993,18 +986,21 @@ func parseInstantTxParams(params []json.RawMessage) (*chainhash.Hash, []*chainha
 		// Create and cache Hash from tx hash.
 		ticketHash, err := chainhash.NewHashFromStr(ticketHashStr)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil,false, err
 		}
 
 		itr, err := strconv.Atoi(i)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil,false, err
 		}
 
 		t[itr] = ticketHash
 	}
 
-	return instantTxHash, t, nil
+	var resend bool
+	err = json.Unmarshal(params[2], &resend)
+
+	return instantTxBytes, t,resend, nil
 
 }
 func parseInstantTxVoteParams(params []json.RawMessage) (instantTxVoteHash *chainhash.Hash, instantTxHash *chainhash.Hash,
