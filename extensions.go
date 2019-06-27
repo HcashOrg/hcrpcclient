@@ -1000,10 +1000,35 @@ func (c *Client) ListAddressTransactions(addresses []hcutil.Address, account str
 // FutureLiveTicketsResult is a future promise to deliver the result
 // of a FutureLiveTicketsResultAsync RPC invocation (or an applicable error).
 type FutureLiveTicketsResult chan *response
+type FutureAiLiveTicketsResult chan *response
 
 // Receive waits for the response promised by the future and returns all
 // currently missed tickets from the missed ticket database.
 func (r FutureLiveTicketsResult) Receive() ([]*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result as a hcjson.LiveTicketsResult.
+	var container hcjson.LiveTicketsResult
+	err = json.Unmarshal(res, &container)
+	if err != nil {
+		return nil, err
+	}
+
+	liveTickets := make([]*chainhash.Hash, 0, len(container.Tickets))
+	for _, ticketStr := range container.Tickets {
+		h, err := chainhash.NewHashFromStr(ticketStr)
+		if err != nil {
+			return nil, err
+		}
+		liveTickets = append(liveTickets, h)
+	}
+
+	return liveTickets, nil
+}
+func (r FutureAiLiveTicketsResult) Receive() ([]*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -1035,6 +1060,10 @@ func (c *Client) LiveTicketsAsync() FutureLiveTicketsResult {
 	cmd := hcjson.NewLiveTicketsCmd()
 	return c.sendCmd(cmd)
 }
+func (c *Client) AiLiveTicketsAsync() FutureAiLiveTicketsResult {
+	cmd := hcjson.NewAiLiveTicketsCmd()
+	return c.sendCmd(cmd)
+}
 
 // LiveTickets returns all currently missed tickets from the missed
 // ticket database in the daemon.
@@ -1042,6 +1071,10 @@ func (c *Client) LiveTicketsAsync() FutureLiveTicketsResult {
 // NOTE: This is a hcd extension.
 func (c *Client) LiveTickets() ([]*chainhash.Hash, error) {
 	return c.LiveTicketsAsync().Receive()
+}
+
+func (c *Client) AiLiveTickets() ([]*chainhash.Hash, error) {
+	return c.AiLiveTicketsAsync().Receive()
 }
 
 // FutureMissedTicketsResult is a future promise to deliver the result
