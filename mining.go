@@ -202,18 +202,12 @@ func (c *Client) GetMiningInfoAsync() FutureGetMiningInfoResult {
 	return c.sendCmd(cmd)
 }
 
-
-
-
 // GetMiningInfo returns mining information.
 func (c *Client) GetMiningInfo() (*hcjson.GetMiningInfoResult, error) {
 	return c.GetMiningInfoAsync().Receive()
 }
 
-
-
 type FutureFetchPendingLockTxResult chan *response
-
 
 // Receive waits for the response promised by the future and returns the mining
 // information.
@@ -233,15 +227,12 @@ func (r FutureFetchPendingLockTxResult) Receive() (*hcjson.FetchPendingLockTxRes
 	return &infoResult, nil
 }
 
-
-
-
-func (c *Client)FetchPendingTxLockAsync(behindNums int64)FutureFetchPendingLockTxResult{
-	cmd:=hcjson.NewFetchPendingLockTxCmd(behindNums)
+func (c *Client) FetchPendingTxLockAsync(behindNums int64) FutureFetchPendingLockTxResult {
+	cmd := hcjson.NewFetchPendingLockTxCmd(behindNums)
 	return c.sendCmd(cmd)
 }
 
-func (c *Client)FetchPendingTxLock(behindNums int64)(*hcjson.FetchPendingLockTxResult,error){
+func (c *Client) FetchPendingTxLock(behindNums int64) (*hcjson.FetchPendingLockTxResult, error) {
 	return c.FetchPendingTxLockAsync(behindNums).Receive()
 }
 
