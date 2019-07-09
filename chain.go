@@ -657,15 +657,15 @@ func (r FutureGetBlockSubsidyResult) Receive() (*hcjson.GetBlockSubsidyResult, e
 // function on the returned instance.
 //
 // See GetBlockSubsidy for the blocking version and more details.
-func (c *Client) GetBlockSubsidyAsync(height int64, voters uint16) FutureGetBlockSubsidyResult {
-	cmd := hcjson.NewGetBlockSubsidyCmd(height, voters)
+func (c *Client) GetBlockSubsidyAsync(height int64, voters uint16,aiVoters uint16) FutureGetBlockSubsidyResult {
+	cmd := hcjson.NewGetBlockSubsidyCmd(height, voters,aiVoters)
 	return c.sendCmd(cmd)
 }
 
 // GetBlockSubsidy returns a data structure of the block subsidy
 // from the server given its height and number of voters.
-func (c *Client) GetBlockSubsidy(height int64, voters uint16) (*hcjson.GetBlockSubsidyResult, error) {
-	return c.GetBlockSubsidyAsync(height, voters).Receive()
+func (c *Client) GetBlockSubsidy(height int64, voters uint16,aiVoters uint16) (*hcjson.GetBlockSubsidyResult, error) {
+	return c.GetBlockSubsidyAsync(height, voters,aiVoters).Receive()
 }
 
 // FutureGetCoinSupplyResult is a future promise to deliver the result of a
