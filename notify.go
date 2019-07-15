@@ -40,7 +40,7 @@ type notificationState struct {
 	notifyStakeDifficulty       bool
 	notifyNewTx                 bool
 	notifyNewTxVerbose          bool
-	notifyNewInstantTx          bool
+	notifyNewAiTx          bool
 }
 
 // Copy returns a deep copy of the receiver.
@@ -53,7 +53,7 @@ func (s *notificationState) Copy() *notificationState {
 	stateCopy.notifyStakeDifficulty = s.notifyStakeDifficulty
 	stateCopy.notifyNewTx = s.notifyNewTx
 	stateCopy.notifyNewTxVerbose = s.notifyNewTxVerbose
-	stateCopy.notifyNewInstantTx = s.notifyNewInstantTx
+	stateCopy.notifyNewAiTx = s.notifyNewAiTx
 	return &stateCopy
 }
 
@@ -204,8 +204,8 @@ type NotificationHandlers struct {
 	// about.
 	OnUnknownNotification func(method string, params []json.RawMessage)
 
-	OnNewInstantTx  func(tx []byte, tickets []*chainhash.Hash,resend bool)
-	OnInstantTxVote func(instantTxVoteHash *chainhash.Hash, instantTxHash *chainhash.Hash, tickeHash *chainhash.Hash, vote bool, sig []byte)
+	OnNewAiTx  func(tx []byte, tickets []*chainhash.Hash,resend bool)
+	OnAiTxVote func(aiTxVoteHash *chainhash.Hash, aiTxHash *chainhash.Hash, tickeHash *chainhash.Hash, vote bool, sig []byte)
 }
 
 // handleNotification examines the passed notification type, performs
@@ -386,30 +386,30 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		}
 
 		c.ntfnHandlers.OnTxAccepted(hash, amt)
-	case hcjson.InstantTxNtfnMethod:
-		if c.ntfnHandlers.OnNewInstantTx == nil {
+	case hcjson.AiTxNtfnMethod:
+		if c.ntfnHandlers.OnNewAiTx == nil {
 			return
 		}
-		instantTxBytes, tickets,resend,err := parseInstantTxParams(ntfn.Params)
+		aiTxBytes, tickets,resend,err := parseAiTxParams(ntfn.Params)
 
 		if err != nil {
-			log.Warnf("Received invalid instant tx accepted "+
+			log.Warnf("Received invalid ai tx accepted "+
 				"notification: %v", err)
 			return
 		}
-		c.ntfnHandlers.OnNewInstantTx(instantTxBytes, tickets,resend)
-	case hcjson.InstantTxVoteNtfnMethod:
-		if c.ntfnHandlers.OnInstantTxVote == nil {
+		c.ntfnHandlers.OnNewAiTx(aiTxBytes, tickets,resend)
+	case hcjson.AiTxVoteNtfnMethod:
+		if c.ntfnHandlers.OnAiTxVote == nil {
 			return
 		}
-		instantTxVoteHash, instantTxHash, ticketHash, vote, sig, err := parseInstantTxVoteParams(ntfn.Params)
+		aiTxVoteHash, aiTxHash, ticketHash, vote, sig, err := parseAiTxVoteParams(ntfn.Params)
 
 		if err != nil {
-			log.Warnf("Received invalid instant tx vote accepted "+
+			log.Warnf("Received invalid ai tx vote accepted "+
 				"notification: %v", err)
 			return
 		}
-		c.ntfnHandlers.OnInstantTxVote(instantTxVoteHash, instantTxHash, ticketHash, vote, sig)
+		c.ntfnHandlers.OnAiTxVote(aiTxVoteHash, aiTxHash, ticketHash, vote, sig)
 		// OnTxAcceptedVerbose
 	case hcjson.TxAcceptedVerboseNtfnMethod:
 		// Ignore the notification if the client is not interested in
@@ -964,12 +964,12 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	return txHash, amt, nil
 }
 
-func parseInstantTxParams(params []json.RawMessage) ([]byte, []*chainhash.Hash, bool,error) {
+func parseAiTxParams(params []json.RawMessage) ([]byte, []*chainhash.Hash, bool,error) {
 	if len(params) != 3 {
 		return nil, nil, false,wrongNumParams(len(params))
 	}
 
-	instantTxBytes,err:=parseHexParam(params[0])
+	aiTxBytes,err:=parseHexParam(params[0])
 	if err != nil {
 		return nil, nil,false, err
 	}
@@ -1000,36 +1000,36 @@ func parseInstantTxParams(params []json.RawMessage) ([]byte, []*chainhash.Hash, 
 	var resend bool
 	err = json.Unmarshal(params[2], &resend)
 
-	return instantTxBytes, t,resend, nil
+	return aiTxBytes, t,resend, nil
 
 }
-func parseInstantTxVoteParams(params []json.RawMessage) (instantTxVoteHash *chainhash.Hash, instantTxHash *chainhash.Hash,
+func parseAiTxVoteParams(params []json.RawMessage) (aiTxVoteHash *chainhash.Hash, aiTxHash *chainhash.Hash,
 	ticketHash *chainhash.Hash, vote bool, sig []byte, err error) {
 	if len(params) != 5 {
 		return nil, nil, nil, false, nil, wrongNumParams(len(params))
 	}
 
 	// Unmarshal first parameter as a string.
-	var instantTxVoteHashStr string
-	err = json.Unmarshal(params[0], &instantTxVoteHashStr)
+	var aiTxVoteHashStr string
+	err = json.Unmarshal(params[0], &aiTxVoteHashStr)
 	if err != nil {
 		return nil, nil, nil, false, nil, err
 	}
 
 	// Create ShaHash from block sha string.
-	instantTxVoteHash, err = chainhash.NewHashFromStr(instantTxVoteHashStr)
+	aiTxVoteHash, err = chainhash.NewHashFromStr(aiTxVoteHashStr)
 	if err != nil {
 		return nil, nil, nil, false, nil, err
 	}
 
-	var instantTxHashStr string
-	err = json.Unmarshal(params[1], &instantTxHashStr)
+	var aiTxHashStr string
+	err = json.Unmarshal(params[1], &aiTxHashStr)
 	if err != nil {
 		return nil, nil, nil, false, nil, err
 	}
 
 	// Create ShaHash from block sha string.
-	instantTxHash, err = chainhash.NewHashFromStr(instantTxHashStr)
+	aiTxHash, err = chainhash.NewHashFromStr(aiTxHashStr)
 	if err != nil {
 		return nil, nil, nil, false, nil, err
 	}
@@ -1062,7 +1062,7 @@ func parseInstantTxVoteParams(params []json.RawMessage) (instantTxVoteHash *chai
 		return nil, nil, nil, false, nil, err
 	}
 
-	return instantTxVoteHash, instantTxHash, ticketHash, vote, sig, nil
+	return aiTxVoteHash, aiTxHash, ticketHash, vote, sig, nil
 
 }
 
@@ -1350,7 +1350,7 @@ func (c *Client) NotifyBlocks() error {
 // FutureNotifyWinningTicketsResult is a future promise to deliver the result of a
 // NotifyWinningTicketsAsync RPC invocation (or an applicable error).
 type FutureNotifyWinningTicketsResult chan *response
-type FutureNotifyNewInstantTxResult chan *response
+type FutureNotifyNewAiTxResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
 // if the registration was not successful.
@@ -1363,7 +1363,7 @@ func (r FutureNotifyWinningTicketsResult) Receive() error {
 	return nil
 }
 
-func (r FutureNotifyNewInstantTxResult) Receive() error {
+func (r FutureNotifyNewAiTxResult) Receive() error {
 	_, err := receiveFuture(r)
 	if err != nil {
 		return err
@@ -1396,7 +1396,7 @@ func (c *Client) NotifyWinningTicketsAsync() FutureNotifyWinningTicketsResult {
 	return c.sendCmd(cmd)
 }
 
-func (c *Client) NotifyNewInstantTxAsync() FutureNotifyNewInstantTxResult {
+func (c *Client) NotifyNewAiTxAsync() FutureNotifyNewAiTxResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
 		return newFutureError(ErrWebsocketsRequired)
@@ -1408,7 +1408,7 @@ func (c *Client) NotifyNewInstantTxAsync() FutureNotifyNewInstantTxResult {
 		return newNilFutureResult()
 	}
 
-	cmd := hcjson.NewNotifyInstantTxCmd()
+	cmd := hcjson.NewNotifyAiTxCmd()
 
 	return c.sendCmd(cmd)
 }
@@ -1428,8 +1428,8 @@ func (c *Client) NotifyWinningTickets() error {
 	return c.NotifyWinningTicketsAsync().Receive()
 }
 
-func (c *Client) NotifyNewInstantTx() error {
-	return c.NotifyNewInstantTxAsync().Receive()
+func (c *Client) NotifyNewAiTx() error {
+	return c.NotifyNewAiTxAsync().Receive()
 }
 
 // FutureNotifySpentAndMissedTicketsResult is a future promise to deliver the result of a

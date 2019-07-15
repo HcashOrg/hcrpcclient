@@ -10,10 +10,10 @@ import (
 )
 
 
-type FutureSendInstantRawTransactionResult chan *response
-type FutureSendInstantTxVoteResult chan *response
+type FutureSendAiRawTransactionResult chan *response
+type FutureSendAiTxVoteResult chan *response
 
-func (r FutureSendInstantRawTransactionResult) Receive() (*chainhash.Hash, error) {
+func (r FutureSendAiRawTransactionResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func (r FutureSendInstantRawTransactionResult) Receive() (*chainhash.Hash, error
 	return chainhash.NewHashFromStr(txHashStr)
 }
 
-func (r FutureSendInstantTxVoteResult) Receive()  error {
+func (r FutureSendAiTxVoteResult) Receive()  error {
 	_, err := receiveFuture(r)
 	if err != nil {
 		return  err
@@ -38,11 +38,11 @@ func (r FutureSendInstantTxVoteResult) Receive()  error {
 	return nil
 }
 
-func (c *Client) SendInstantRawTransaction(tx *wire.MsgInstantTx, allowHighFees bool) (*chainhash.Hash, error) {
-	return c.SendInstantRawTransactionAsync(tx, allowHighFees).Receive()
+func (c *Client) SendAiRawTransaction(tx *wire.MsgAiTx, allowHighFees bool) (*chainhash.Hash, error) {
+	return c.SendAiRawTransactionAsync(tx, allowHighFees).Receive()
 }
 
-func (c *Client) SendInstantRawTransactionAsync(tx *wire.MsgInstantTx, allowHighFees bool) FutureSendInstantRawTransactionResult {
+func (c *Client) SendAiRawTransactionAsync(tx *wire.MsgAiTx, allowHighFees bool) FutureSendAiRawTransactionResult {
 	txHex := ""
 	if tx != nil {
 		// Serialize the transaction and convert to hex string.
@@ -53,28 +53,28 @@ func (c *Client) SendInstantRawTransactionAsync(tx *wire.MsgInstantTx, allowHigh
 		txHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	cmd := hcjson.NewSendInstantRawTransactionCmd(txHex, &allowHighFees)
+	cmd := hcjson.NewSendAiRawTransactionCmd(txHex, &allowHighFees)
 	return c.sendCmd(cmd)
 }
 
 
 
-func (c *Client)SendInstantTxVote(instantTxVote *wire.MsgInstantTxVote)error{
-	return c.SendInstantTxVoteAsync(instantTxVote).Receive()
+func (c *Client)SendAiTxVote(aiTxVote *wire.MsgAiTxVote)error{
+	return c.SendAiTxVoteAsync(aiTxVote).Receive()
 }
 
-func (c *Client) SendInstantTxVoteAsync(msgInstantTxVote *wire.MsgInstantTxVote) FutureSendInstantTxVoteResult {
+func (c *Client) SendAiTxVoteAsync(msgAiTxVote *wire.MsgAiTxVote) FutureSendAiTxVoteResult {
 	txvoteHex := ""
-	if msgInstantTxVote != nil {
+	if msgAiTxVote != nil {
 		// Serialize the transaction and convert to hex string.
-		buf := bytes.NewBuffer(make([]byte, 0, msgInstantTxVote.SerializeSize()))
-		if err := msgInstantTxVote.Serialize(buf); err != nil {
+		buf := bytes.NewBuffer(make([]byte, 0, msgAiTxVote.SerializeSize()))
+		if err := msgAiTxVote.Serialize(buf); err != nil {
 			return newFutureError(err)
 		}
 		txvoteHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	cmd := hcjson.NewSendInstantTxVoteCmd(txvoteHex)
+	cmd := hcjson.NewSendAiTxVoteCmd(txvoteHex)
 	return c.sendCmd(cmd)
 }
 
