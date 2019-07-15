@@ -257,7 +257,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 	case hcjson.RelevantTxAcceptedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
-		log.Error("RelevantTxAcceptedNtfnMethod:", ntfn.Params)
+		log.Debug("RelevantTxAcceptedNtfnMethod:", ntfn.Params)
 		if c.ntfnHandlers.OnRelevantTxAccepted == nil {
 			return
 		}
