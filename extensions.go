@@ -241,10 +241,26 @@ func (c *Client) ExistsAddresses(addresses []hcutil.Address) (string, error) {
 // FutureExistsMissedTicketsResult is a future promise to deliver the result of
 // an ExistsMissedTicketsAsync RPC invocation (or an applicable error).
 type FutureExistsMissedTicketsResult chan *response
+type FutureExistsMissedAiTicketsResult chan *response
 
 // Receive waits for the response promised by the future and returns whether
 // or not the ticket exists in the missed ticket database.
 func (r FutureExistsMissedTicketsResult) Receive() (string, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Unmarshal the result as a string.
+	var exists string
+	err = json.Unmarshal(res, &exists)
+	if err != nil {
+		return "", err
+	}
+	return exists, nil
+}
+
+func (r FutureExistsMissedAiTicketsResult) Receive() (string, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return "", err
@@ -272,10 +288,24 @@ func (c *Client) ExistsMissedTicketsAsync(hashes []*chainhash.Hash) FutureExists
 	return c.sendCmd(cmd)
 }
 
+func (c *Client) ExistsMissedAiTicketsAsync(hashes []*chainhash.Hash) FutureExistsMissedAiTicketsResult {
+	hashBlob := make([]byte, len(hashes)*chainhash.HashSize)
+	for i, hash := range hashes {
+		copy(hashBlob[i*chainhash.HashSize:(i+1)*chainhash.HashSize],
+			hash[:])
+	}
+	cmd := hcjson.NewExistsMissedAiTicketsCmd(hex.EncodeToString(hashBlob))
+	return c.sendCmd(cmd)
+}
+
 // ExistsMissedTickets returns a hex-encoded bitset describing whether or not
 // ticket hashes exists in the missed ticket database.
 func (c *Client) ExistsMissedTickets(hashes []*chainhash.Hash) (string, error) {
 	return c.ExistsMissedTicketsAsync(hashes).Receive()
+}
+
+func (c *Client) ExistsMissedAiTickets(hashes []*chainhash.Hash) (string, error) {
+	return c.ExistsMissedAiTicketsAsync(hashes).Receive()
 }
 
 // FutureExistsExpiredTicketsResult is a future promise to deliver the result
