@@ -109,6 +109,7 @@ func (c *Client) DebugLevel(levelSpec string) (string, error) {
 // FutureEstimateStakeDiffResult is a future promise to deliver the result of a
 // EstimateStakeDiffAsync RPC invocation (or an applicable error).
 type FutureEstimateStakeDiffResult chan *response
+type FutureEstimateAiStakeDiffResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // and height of the block in the longest (best) chain.
@@ -120,6 +121,22 @@ func (r FutureEstimateStakeDiffResult) Receive() (*hcjson.EstimateStakeDiffResul
 
 	// Unmarsal result as a estimatestakediff result object.
 	var est hcjson.EstimateStakeDiffResult
+	err = json.Unmarshal(res, &est)
+	if err != nil {
+		return nil, err
+	}
+
+	return &est, nil
+}
+
+func (r FutureEstimateAiStakeDiffResult) Receive() (*hcjson.EstimateAiStakeDiffResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarsal result as a estimateaistakediff result object.
+	var est hcjson.EstimateAiStakeDiffResult
 	err = json.Unmarshal(res, &est)
 	if err != nil {
 		return nil, err
@@ -146,6 +163,19 @@ func (c *Client) EstimateStakeDiffAsync(tickets *uint32) FutureEstimateStakeDiff
 // NOTE: This is a hcd extension.
 func (c *Client) EstimateStakeDiff(tickets *uint32) (*hcjson.EstimateStakeDiffResult, error) {
 	return c.EstimateStakeDiffAsync(tickets).Receive()
+}
+
+func (c *Client) EstimateAiStakeDiffAsync(tickets *uint32) FutureEstimateAiStakeDiffResult {
+	cmd := hcjson.NewEstimateAiStakeDiffCmd(tickets)
+	return c.sendCmd(cmd)
+}
+
+// EstimateAiStakeDiff returns the minimum, maximum, and expected next stake
+// difficulty.
+//
+// NOTE: This is a hcd extension.
+func (c *Client) EstimateAiStakeDiff(tickets *uint32) (*hcjson.EstimateAiStakeDiffResult, error) {
+	return c.EstimateAiStakeDiffAsync(tickets).Receive()
 }
 
 // FutureExistsAddressResult is a future promise to deliver the result
@@ -895,7 +925,7 @@ func (c *Client) GetStakeVersions(hash string, count int32) (*hcjson.GetStakeVer
 // FutureGetTicketPoolValueResult is a future promise to deliver the result of a
 // GetTicketPoolValueAsync RPC invocation (or an applicable error).
 type FutureGetTicketPoolValueResult chan *response
-
+type FutureGetAiTicketPoolValueResult chan *response
 // Receive waits for the response promised by the future and returns the network
 // the server is running on.
 func (r FutureGetTicketPoolValueResult) Receive() (hcutil.Amount, error) {
@@ -912,6 +942,28 @@ func (r FutureGetTicketPoolValueResult) Receive() (hcutil.Amount, error) {
 	}
 
 	// Convert to an amount.
+	amt, err := hcutil.NewAmount(val)
+	if err != nil {
+		return 0, err
+	}
+
+	return amt, nil
+}
+
+func (r FutureGetAiTicketPoolValueResult) Receive() (hcutil.Amount, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Unmarshal result as a float64.
+	var val float64
+	err = json.Unmarshal(res, &val)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert to an amount.errGetTicketPoolValueAsync
 	amt, err := hcutil.NewAmount(val)
 	if err != nil {
 		return 0, err
@@ -937,6 +989,15 @@ func (c *Client) GetTicketPoolValueAsync() FutureGetTicketPoolValueResult {
 // NOTE: This is a hcd extension.
 func (c *Client) GetTicketPoolValue() (hcutil.Amount, error) {
 	return c.GetTicketPoolValueAsync().Receive()
+}
+
+func (c *Client) GetAiTicketPoolValueAsync() FutureGetAiTicketPoolValueResult {
+	cmd := hcjson.NewGetAiTicketPoolValueCmd()
+	return c.sendCmd(cmd)
+}
+
+func (c *Client) GetAiTicketPoolValue() (hcutil.Amount, error) {
+	return c.GetAiTicketPoolValueAsync().Receive()
 }
 
 // FutureGetVoteInfoResult is a future promise to deliver the result of a
@@ -1030,7 +1091,7 @@ func (c *Client) ListAddressTransactions(addresses []hcutil.Address, account str
 // FutureLiveTicketsResult is a future promise to deliver the result
 // of a FutureLiveTicketsResultAsync RPC invocation (or an applicable error).
 type FutureLiveTicketsResult chan *response
-type FutureAiLiveTicketsResult chan *response
+type FutureLiveAiTicketsResult chan *response
 
 // Receive waits for the response promised by the future and returns all
 // currently missed tickets from the missed ticket database.
@@ -1058,14 +1119,14 @@ func (r FutureLiveTicketsResult) Receive() ([]*chainhash.Hash, error) {
 
 	return liveTickets, nil
 }
-func (r FutureAiLiveTicketsResult) Receive() ([]*chainhash.Hash, error) {
+func (r FutureLiveAiTicketsResult) Receive() ([]*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmarshal the result as a hcjson.LiveTicketsResult.
-	var container hcjson.LiveTicketsResult
+	var container hcjson.LiveAiTicketsResult
 	err = json.Unmarshal(res, &container)
 	if err != nil {
 		return nil, err
@@ -1090,8 +1151,8 @@ func (c *Client) LiveTicketsAsync() FutureLiveTicketsResult {
 	cmd := hcjson.NewLiveTicketsCmd()
 	return c.sendCmd(cmd)
 }
-func (c *Client) AiLiveTicketsAsync() FutureAiLiveTicketsResult {
-	cmd := hcjson.NewAiLiveTicketsCmd()
+func (c *Client) LiveAiTicketsAsync() FutureLiveAiTicketsResult {
+	cmd := hcjson.NewLiveAiTicketsCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -1103,8 +1164,8 @@ func (c *Client) LiveTickets() ([]*chainhash.Hash, error) {
 	return c.LiveTicketsAsync().Receive()
 }
 
-func (c *Client) AiLiveTickets() ([]*chainhash.Hash, error) {
-	return c.AiLiveTicketsAsync().Receive()
+func (c *Client) LiveAiTickets() ([]*chainhash.Hash, error) {
+	return c.LiveAiTicketsAsync().Receive()
 }
 
 // FutureMissedTicketsResult is a future promise to deliver the result
@@ -1205,7 +1266,7 @@ func (c *Client) Session() (*hcjson.SessionResult, error) {
 // FutureTicketFeeInfoResult is a future promise to deliver the result of a
 // TicketFeeInfoAsync RPC invocation (or an applicable error).
 type FutureTicketFeeInfoResult chan *response
-
+type FutureAiTicketFeeInfoResult chan *response
 // Receive waits for the response promised by the future and returns the
 // ticketfeeinfo result.
 func (r FutureTicketFeeInfoResult) Receive() (*hcjson.TicketFeeInfoResult, error) {
@@ -1224,6 +1285,21 @@ func (r FutureTicketFeeInfoResult) Receive() (*hcjson.TicketFeeInfoResult, error
 	return &tfir, nil
 }
 
+func (r FutureAiTicketFeeInfoResult) Receive() (*hcjson.AiTicketFeeInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarsal result as a ticketfeeinfo result object.
+	var tfir hcjson.AiTicketFeeInfoResult
+	err = json.Unmarshal(res, &tfir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tfir, nil
+}
 // TicketFeeInfoAsync returns an instance of a type that can be used to get the result
 // of the RPC at some future time by invoking the Receive function on the
 // returned instance.
@@ -1259,13 +1335,63 @@ func (c *Client) TicketFeeInfo(blocks *uint32, windows *uint32) (*hcjson.TicketF
 	return c.TicketFeeInfoAsync(blocks, windows).Receive()
 }
 
+func (c *Client) AiTicketFeeInfoAsync(blocks *uint32, windows *uint32) FutureAiTicketFeeInfoResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Avoid passing actual nil values, since they can cause arguments
+	// not to pass. Pass zero values instead.
+	if blocks == nil {
+		blocks = &zeroUint32
+	}
+	if windows == nil {
+		windows = &zeroUint32
+	}
+
+	cmd := hcjson.NewAiTicketFeeInfoCmd(blocks, windows)
+	return c.sendCmd(cmd)
+}
+
+// TicketFeeInfo returns information about ticket fees.
+//
+// This RPC requires the client to be running in websocket mode.
+//
+// NOTE: This is a hcd extension.
+func (c *Client) AiTicketFeeInfo(blocks *uint32, windows *uint32) (*hcjson.AiTicketFeeInfoResult, error) {
+	return c.AiTicketFeeInfoAsync(blocks, windows).Receive()
+}
+
 // FutureTicketVWAPResult is a future promise to deliver the result of a
 // TicketVWAPAsync RPC invocation (or an applicable error).
 type FutureTicketVWAPResult chan *response
+type FutureAiTicketVWAPResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // ticketvwap result.
 func (r FutureTicketVWAPResult) Receive() (hcutil.Amount, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Unmarsal result as a ticketvwap result object.
+	var vwap float64
+	err = json.Unmarshal(res, &vwap)
+	if err != nil {
+		return 0, err
+	}
+
+	amt, err := hcutil.NewAmount(vwap)
+	if err != nil {
+		return 0, err
+	}
+
+	return amt, nil
+}
+
+func (r FutureAiTicketVWAPResult) Receive() (hcutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
@@ -1303,6 +1429,16 @@ func (c *Client) TicketVWAPAsync(start *uint32, end *uint32) FutureTicketVWAPRes
 	return c.sendCmd(cmd)
 }
 
+func (c *Client) AiTicketVWAPAsync(start *uint32, end *uint32) FutureAiTicketVWAPResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	cmd := hcjson.NewAiTicketVWAPCmd(start, end)
+	return c.sendCmd(cmd)
+}
+
 // TicketVWAP returns the vwap weighted average price of tickets.
 //
 // This RPC requires the client to be running in websocket mode.
@@ -1310,6 +1446,10 @@ func (c *Client) TicketVWAPAsync(start *uint32, end *uint32) FutureTicketVWAPRes
 // NOTE: This is a hcd extension.
 func (c *Client) TicketVWAP(start *uint32, end *uint32) (hcutil.Amount, error) {
 	return c.TicketVWAPAsync(start, end).Receive()
+}
+
+func (c *Client) AiTicketVWAP(start *uint32, end *uint32) (hcutil.Amount, error) {
+	return c.AiTicketVWAPAsync(start, end).Receive()
 }
 
 // FutureTxFeeInfoResult is a future promise to deliver the result of a
